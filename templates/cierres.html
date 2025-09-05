@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Cierres de Caja</h2>
+<table class="table table-bordered">
+    <thead>
+        <tr><th>Fecha</th><th>Efectivo</th><th>Tarjeta</th><th>Transferencia</th><th>Total</th></tr>
+    </thead>
+    <tbody>
+        {% for c in cierres %}
+        <tr>
+            <td>{{ c.fecha }}</td>
+            <td>${{ c.total_efectivo }}</td>
+            <td>${{ c.total_tarjeta }}</td>
+            <td>${{ c.total_transferencia }}</td>
+            <td>${{ c.total_general }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

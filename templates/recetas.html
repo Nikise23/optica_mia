@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Recetas</h2>
+<a href="/recetas/nueva" class="btn btn-primary mb-3">Cargar Receta</a>
+<table class="table table-bordered">
+    <thead>
+        <tr><th>Paciente</th><th>Médico</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+        {% for r in recetas %}
+        <tr>
+            <td>{{ r.paciente_id }}</td>
+            <td>{{ r.medico_id }}</td>
+            <td>{{ r.fecha }}</td>
+            <td>${{ r.total }}</td>
+            <td>
+                <a href="/recetas/ver/{{ r.id }}" class="btn btn-sm btn-info">Ver</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

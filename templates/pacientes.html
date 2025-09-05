@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Pacientes</h2>
+<a href="/pacientes/nuevo" class="btn btn-primary mb-3">Agregar Paciente</a>
+<table class="table table-bordered">
+    <thead>
+        <tr><th>Nombre</th><th>DNI</th><th>Contacto</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+        {% for p in pacientes %}
+        <tr>
+            <td>{{ p.nombre }} {{ p.apellido }}</td>
+            <td>{{ p.dni }}</td>
+            <td>{{ p.contacto }}</td>
+            <td>
+                <a href="/pacientes/editar/{{ p.id }}" class="btn btn-sm btn-warning">Editar</a>
+                <a href="/pacientes/eliminar/{{ p.id }}" class="btn btn-sm btn-danger">Eliminar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
