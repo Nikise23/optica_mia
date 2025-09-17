@@ -9,9 +9,9 @@
     <label class="form-label">Receta</label>
     <select name="receta_id" class="form-select" required>
       <option value="">Seleccionar receta</option>
-      {% for r in recetas_sin_venta %}
-      <option value="{{ r.id }}">
-        {{ r.paciente.apellido }}, {{ r.paciente.nombre }} - {{ r.medico.apellido }}, {{ r.medico.nombre }} - Total ${{ r.total | round(2) }}
+      {% for item in recetas_con_saldo %}
+      <option value="{{ item.receta.id }}">
+        {{ item.receta.paciente.apellido }}, {{ item.receta.paciente.nombre }} - {{ item.receta.medico.apellido }}, {{ item.receta.medico.nombre }} - Restante ${{ item.restante | round(2) }}
       </option>
       {% endfor %}
     </select>
@@ -36,11 +36,15 @@
   <div class="col-12">
     <div class="alert alert-info" id="resumenPago">
       Seleccione una receta para ver totales.
-      <div class="form-check mt-2">
-        <input class="form-check-input" type="checkbox" id="pagoParcial" checked>
-        <label class="form-check-label" for="pagoParcial">
-          Pago parcial (si lo desmarcás, se paga todo el restante)
-        </label>
+      <div class="d-flex gap-3 mt-2 align-items-center">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="tipoPago" id="pagoParcial" value="parcial" checked>
+          <label class="form-check-label" for="pagoParcial">Pago parcial</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="tipoPago" id="pagoTotal" value="total">
+          <label class="form-check-label" for="pagoTotal">Pagar total restante</label>
+        </div>
       </div>
     </div>
   </div>
@@ -51,21 +55,22 @@
 </form>
 <script>
   const recetas = {
-    {% for r in recetas_sin_venta %}
-    {{ r.id }}: { total: {{ r.total or 0 }}, pagos: [
-      {% for pg in r.pagos %}{ monto: {{ pg.monto or 0 }}, d: {{ pg.descuento or 0 }} },{% endfor %}
+    {% for item in recetas_con_saldo %}
+    {{ item.receta.id }}: { total: {{ item.receta.total or 0 }}, pagos: [
+      {% for pg in item.receta.pagos %}{ monto: {{ pg.monto or 0 }}, d: {{ pg.descuento or 0 }} },{% endfor %}
     ] },
     {% endfor %}
   };
   const selectReceta = document.querySelector('select[name="receta_id"]');
   const monto = document.getElementById('monto');
   const descuento = document.getElementById('descuento');
-  const checkParcial = document.getElementById('pagoParcial');
+  const radioParcial = document.getElementById('pagoParcial');
+  const radioTotal = document.getElementById('pagoTotal');
   const resumen = document.getElementById('resumenPago');
   function actualizarResumen() {
     const rid = selectReceta.value;
     if (!rid || !recetas[rid]) { resumen.textContent = 'Seleccione una receta para ver totales.'; return; }
-    const total = Number(recetas[rid].total) || 0;
+    let total = Number(recetas[rid].total) || 0;
     const pagos = recetas[rid].pagos || [];
     const pagado_neto = pagos.reduce((acc, p) => acc + Number(p.monto||0) * (1 - Number(p.d||0)/100), 0);
     const restante = Math.max(0, total - pagado_neto);
@@ -73,10 +78,18 @@
     const d = Math.min(100, Math.max(0, Number(descuento.value) || 0));
     // Auto-completar monto con total tras descuento si pagoParcial no está marcado, o si monto vacío
     const totalConDesc = total * (1 - d/100);
-    if (!checkParcial.checked || !m) {
-      // Si pago total, monto sugerido es restante tras descuento aplicado al total
+    if (radioTotal.checked) {
+      // Modo total: bloquear edición y sugerir total restante con descuento aplicado
       const sugerido = Math.max(0, totalConDesc - pagado_neto);
       monto.value = sugerido.toFixed(2);
+      monto.readOnly = true;
+    } else {
+      // Modo parcial: permitir edición, no auto-sobrescribir lo que escribe el usuario
+      if (!m) {
+        // Si aún no escribió nada, sugerir algo amistoso (por ej. 0 o una seña típica)
+        monto.value = '';
+      }
+      monto.readOnly = false;
     }
     // Si hay descuento y es el primer pago, actualizar el total mostrado
     if (d > 0 && pagos.length === 0) {
@@ -90,7 +103,8 @@
     selectReceta.addEventListener(evt, actualizarResumen);
     monto.addEventListener(evt, actualizarResumen);
     descuento.addEventListener(evt, actualizarResumen);
-    checkParcial.addEventListener(evt, actualizarResumen);
+    radioParcial.addEventListener(evt, actualizarResumen);
+    radioTotal.addEventListener(evt, actualizarResumen);
   });
   actualizarResumen();
 </script>

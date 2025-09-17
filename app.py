@@ -537,6 +537,13 @@ def caja_pago_create():
             # Validar saldo restante de la receta
             receta = Receta.query.get_or_404(receta_id_val)
             pagos_existentes = Pago.query.filter_by(receta_id=receta.id).all()
+
+            # Si es el primer pago con descuento, aplicar el descuento al total de la receta
+            if len(pagos_existentes) == 0 and descuento_pct > 0:
+                receta.total = (receta.total or 0) * (1 - (descuento_pct / 100.0))
+                # Para evitar doble descuento sobre este pago, se registra con 0% de descuento
+                descuento_pct = 0.0
+
             total_pagado_neto = sum((px.monto or 0) * (1 - ((px.descuento or 0) / 100.0)) for px in pagos_existentes)
             saldo_restante = (receta.total or 0) - total_pagado_neto
             monto_neto = monto_val * (1 - (descuento_pct / 100.0))
@@ -551,11 +558,6 @@ def caja_pago_create():
                 descuento=descuento_pct,
             )
             db.session.add(pago)
-            
-            # Si es el primer pago con descuento, actualizar el total de la receta al neto
-            if descuento_pct > 0 and len(receta.pagos) == 0:
-                receta.total = monto_val * (1 - descuento_pct / 100.0)
-            
             db.session.commit()
             flash('Pago registrado correctamente')
             return redirect(url_for('caja_dashboard'))
@@ -567,11 +569,11 @@ def caja_pago_create():
     recetas_con_saldo = []
     for r in Receta.query.join(Paciente).join(Medico).all():
         pagos_netos = sum((p.monto or 0) * (1 - ((p.descuento or 0) / 100.0)) for p in getattr(r, 'pagos', []) or [])
-        saldo_restante = (r.total or 0) - pagos_netos
+        saldo_restante = max(0.0, (r.total or 0) - pagos_netos)
         if saldo_restante > 1e-6:  # Tolerancia para redondeos
-            recetas_con_saldo.append(r)
+            recetas_con_saldo.append({'receta': r, 'restante': saldo_restante, 'pagado_neto': pagos_netos})
     
-    return render_template('pago_form.html', recetas_sin_venta=recetas_con_saldo)
+    return render_template('pago_form.html', recetas_con_saldo=recetas_con_saldo)
 
 
 @app.route('/caja/cierre/new', methods=['GET', 'POST'])
