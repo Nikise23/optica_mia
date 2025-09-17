@@ -36,7 +36,7 @@ class Medico(db.Model):
 class Receta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     paciente_id = db.Column(db.Integer, db.ForeignKey('paciente.id'))
-    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'))
+    medico_id = db.Column(db.Integer, db.ForeignKey('medico.id'), nullable=True)
     fecha = db.Column(db.Date)
     tipo_lente = db.Column(db.String(100))
     medida_od = db.Column(db.String(50))
@@ -63,6 +63,7 @@ class CierreCaja(db.Model):
     total_tarjeta = db.Column(db.Float)
     total_transferencia = db.Column(db.Float)
     total_general = db.Column(db.Float)
+    estado_abierta = db.Column(db.Boolean, default=True)  # True = abierta, False = cerrada
 
 # Nuevos modelos para pagos parciales y gastos
 class Pago(db.Model):

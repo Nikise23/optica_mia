@@ -25,6 +25,9 @@ with app.app_context():
             # Add receta.armazon_id if missing
             if column_exists('receta', 'id') and not column_exists('receta', 'armazon_id'):
                 cur.execute("ALTER TABLE receta ADD COLUMN armazon_id INTEGER")
+            # Add cierre_caja.estado_abierta if missing
+            if column_exists('cierre_caja', 'id') and not column_exists('cierre_caja', 'estado_abierta'):
+                cur.execute("ALTER TABLE cierre_caja ADD COLUMN estado_abierta BOOLEAN DEFAULT 1")
             conn.commit()
             cur.close()
             conn.close()
@@ -61,15 +64,16 @@ def dashboard():
     comisiones = {}
     comisiones_detalle = []
     for medico in medicos:
-        # Sumar pagos netos de todas sus recetas
+        # Sumar pagos netos de todas sus recetas del mes actual
         pagos_netos = 0.0
         for receta in medico.recetas:
-            for p in getattr(receta, 'pagos', []) or []:
-                pagos_netos += (p.monto or 0) * (1 - ((p.descuento or 0) / 100.0))
+            if receta.fecha >= first_of_month and receta.fecha < next_month:
+                for p in getattr(receta, 'pagos', []) or []:
+                    pagos_netos += (p.monto or 0) * (1 - ((p.descuento or 0) / 100.0))
         porcentaje = medico.porcentaje_comision or 0
         monto = pagos_netos * (porcentaje / 100.0)
         comisiones[medico.id] = monto
-        comisiones_detalle.append({'medico': medico, 'porcentaje': porcentaje, 'monto': monto})
+        comisiones_detalle.append({'medico': medico, 'porcentaje': porcentaje, 'monto': monto, 'pagos_netos': pagos_netos})
 
     # Cierre de hoy
     cierre_hoy = CierreCaja.query.filter_by(fecha=today).first()
@@ -117,6 +121,8 @@ def dashboard():
         pagos_mes_neto=pagos_mes_neto,
         gastos_mes=gastos_mes,
         datos_grafico=datos_grafico,
+        first_of_month=first_of_month,
+        next_month=next_month,
     )
 
 # CRUD de productos, pacientes, médicos, recetas, caja...
@@ -527,6 +533,13 @@ def caja_dashboard():
 
 @app.route('/caja/pago/new', methods=['GET', 'POST'])
 def caja_pago_create():
+    # Verificar si la caja está abierta
+    hoy = date.today()
+    cierre_hoy = CierreCaja.query.filter_by(fecha=hoy).first()
+    if cierre_hoy and not cierre_hoy.estado_abierta:
+        flash('La caja está cerrada. Debe reabrirla para registrar pagos.', 'warning')
+        return redirect(url_for('caja_dashboard'))
+    
     if request.method == 'POST':
         try:
             receta_id_val = int(request.form.get('receta_id') or 0)
@@ -583,7 +596,7 @@ def caja_cierre_create():
             # Verificar si ya existe cierre para hoy
             hoy = date.today()
             cierre_existente = CierreCaja.query.filter_by(fecha=hoy).first()
-            if cierre_existente:
+            if cierre_existente and not cierre_existente.estado_abierta:
                 flash('Ya existe un cierre de caja para hoy')
                 return redirect(url_for('caja_dashboard'))
             
@@ -594,22 +607,52 @@ def caja_cierre_create():
             total_transferencia = sum((p.monto or 0) * (1 - ((p.descuento or 0) / 100.0)) for p in pagos_hoy if p.metodo_pago == 'Transferencia')
             total_general = sum((p.monto or 0) * (1 - ((p.descuento or 0) / 100.0)) for p in pagos_hoy)
             
-            cierre = CierreCaja(
-                fecha=hoy,
-                total_efectivo=total_efectivo,
-                total_tarjeta=total_tarjeta,
-                total_transferencia=total_transferencia,
-                total_general=total_general
-            )
-            db.session.add(cierre)
+            if cierre_existente:
+                # Actualizar cierre existente
+                cierre_existente.total_efectivo = total_efectivo
+                cierre_existente.total_tarjeta = total_tarjeta
+                cierre_existente.total_transferencia = total_transferencia
+                cierre_existente.total_general = total_general
+                cierre_existente.estado_abierta = False
+            else:
+                # Crear nuevo cierre
+                cierre = CierreCaja(
+                    fecha=hoy,
+                    total_efectivo=total_efectivo,
+                    total_tarjeta=total_tarjeta,
+                    total_transferencia=total_transferencia,
+                    total_general=total_general,
+                    estado_abierta=False
+                )
+                db.session.add(cierre)
+            
             db.session.commit()
-            flash('Cierre de caja registrado correctamente')
+            flash('Caja cerrada correctamente')
             return redirect(url_for('caja_dashboard'))
         except Exception as exc:
             db.session.rollback()
-            flash(f'Error al registrar cierre: {exc}')
+            flash(f'Error al cerrar caja: {exc}')
     
     return render_template('cierre_form.html')
+
+
+@app.route('/caja/reabrir', methods=['POST'])
+def caja_reabrir():
+    try:
+        hoy = date.today()
+        cierre_hoy = CierreCaja.query.filter_by(fecha=hoy).first()
+        if not cierre_hoy:
+            flash('No hay cierre de caja para hoy')
+            return redirect(url_for('caja_dashboard'))
+        
+        cierre_hoy.estado_abierta = True
+        db.session.commit()
+        flash('Caja reabierta correctamente')
+        return redirect(url_for('caja_dashboard'))
+    except Exception as exc:
+        db.session.rollback()
+        flash(f'Error al reabrir caja: {exc}')
+        return redirect(url_for('caja_dashboard'))
 
 
 @app.route('/caja/pago/<int:pago_id>/delete', methods=['POST'])
@@ -633,6 +676,13 @@ def gastos_list():
 
 @app.route('/gastos/new', methods=['GET', 'POST'])
 def gastos_create():
+    # Verificar si la caja está abierta
+    hoy = date.today()
+    cierre_hoy = CierreCaja.query.filter_by(fecha=hoy).first()
+    if cierre_hoy and not cierre_hoy.estado_abierta:
+        flash('La caja está cerrada. Debe reabrirla para registrar gastos.', 'warning')
+        return redirect(url_for('gastos_list'))
+    
     if request.method == 'POST':
         try:
             fecha_str = (request.form.get('fecha') or '').strip()
@@ -665,6 +715,82 @@ def gastos_delete(gasto_id: int):
         db.session.rollback()
         flash(f'No se pudo eliminar: {exc}')
     return redirect(url_for('gastos_list'))
+
+
+@app.route('/reporte-mensual')
+def reporte_mensual():
+    # Fechas del mes actual
+    hoy = date.today()
+    first_of_month = date(hoy.year, hoy.month, 1)
+    if hoy.month == 12:
+        next_month = date(hoy.year + 1, 1, 1)
+    else:
+        next_month = date(hoy.year, hoy.month + 1, 1)
+    
+    # Recaudación neta del mes
+    pagos_mes_neto = 0.0
+    pagos_detalle = []
+    for p in Pago.query.filter(Pago.fecha >= first_of_month, Pago.fecha < next_month).all():
+        monto_neto = (p.monto or 0) * (1 - ((p.descuento or 0) / 100.0))
+        pagos_mes_neto += monto_neto
+        pagos_detalle.append({
+            'fecha': p.fecha,
+            'paciente': f"{p.receta.paciente.apellido}, {p.receta.paciente.nombre}",
+            'medico': f"{p.receta.medico.apellido}, {p.receta.medico.nombre}" if p.receta.medico else "Sin médico",
+            'metodo': p.metodo_pago or 'Sin especificar',
+            'monto_bruto': p.monto or 0,
+            'descuento': p.descuento or 0,
+            'monto_neto': monto_neto
+        })
+    
+    # Gastos del mes
+    gastos_mes = (
+        db.session.query(func.coalesce(func.sum(Gasto.monto), 0))
+        .filter(Gasto.fecha >= first_of_month, Gasto.fecha < next_month)
+        .scalar()
+    )
+    gastos_detalle = Gasto.query.filter(Gasto.fecha >= first_of_month, Gasto.fecha < next_month).order_by(Gasto.fecha.desc()).all()
+    
+    # Comisiones por médico del mes
+    medicos = Medico.query.all()
+    comisiones_detalle = []
+    total_comisiones = 0.0
+    for medico in medicos:
+        pagos_netos = 0.0
+        for receta in medico.recetas:
+            if receta.fecha >= first_of_month and receta.fecha < next_month:
+                for p in getattr(receta, 'pagos', []) or []:
+                    pagos_netos += (p.monto or 0) * (1 - ((p.descuento or 0) / 100.0))
+        porcentaje = medico.porcentaje_comision or 0
+        monto_comision = pagos_netos * (porcentaje / 100.0)
+        total_comisiones += monto_comision
+        if pagos_netos > 0:  # Solo mostrar médicos con ventas
+            comisiones_detalle.append({
+                'medico': medico,
+                'porcentaje': porcentaje,
+                'pagos_netos': pagos_netos,
+                'comision': monto_comision
+            })
+    
+    # Resumen final
+    saldo_mes = pagos_mes_neto - gastos_mes - total_comisiones
+    
+    from datetime import timedelta
+    
+    return render_template(
+        'reporte_mensual.html',
+        first_of_month=first_of_month,
+        next_month=next_month,
+        pagos_mes_neto=pagos_mes_neto,
+        pagos_detalle=pagos_detalle,
+        gastos_mes=gastos_mes,
+        gastos_detalle=gastos_detalle,
+        comisiones_detalle=comisiones_detalle,
+        total_comisiones=total_comisiones,
+        saldo_mes=saldo_mes,
+        timedelta=timedelta,
+    )
+
 
 # CSV export del cierre diario
 from flask import Response

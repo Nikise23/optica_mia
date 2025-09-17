@@ -7,8 +7,12 @@
   <h2 class="mb-0">Caja</h2>
   <div class="d-flex gap-2">
     <a class="btn btn-success" href="{{ url_for('caja_pago_create') }}"><i class="bi bi-plus-lg"></i> Nuevo Pago</a>
-    {% if not cierre_hoy %}
+    {% if not cierre_hoy or cierre_hoy.estado_abierta %}
     <a class="btn btn-warning" href="{{ url_for('caja_cierre_create') }}"><i class="bi bi-cash-coin"></i> Cerrar Caja</a>
+    {% else %}
+    <form method="post" action="{{ url_for('caja_reabrir') }}" style="display:inline">
+      <button class="btn btn-success" type="submit"><i class="bi bi-unlock"></i> Reabrir Caja</button>
+    </form>
     {% endif %}
     <a class="btn btn-outline-secondary" href="{{ url_for('caja_cierre_csv') }}"><i class="bi bi-download"></i> Exportar CSV</a>
     <a class="btn btn-outline-danger" href="{{ url_for('gastos_list') }}"><i class="bi bi-receipt"></i> Gastos</a>
@@ -37,7 +41,13 @@
     <div class="card text-bg-info h-100">
       <div class="card-body">
         <h6 class="card-title mb-1">Estado caja</h6>
-        <div class="display-6">{{ 'Cerrada' if cierre_hoy else 'Abierta' }}</div>
+        <div class="display-6">
+          {% if cierre_hoy and not cierre_hoy.estado_abierta %}
+            <span class="text-danger">Cerrada</span>
+          {% else %}
+            <span class="text-success">Abierta</span>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>

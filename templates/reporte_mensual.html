@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}Reporte Mensual · ÓpticaApp{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">Reporte Mensual</h2>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}"><i class="bi bi-arrow-left"></i> Volver</a>
+  </div>
+</div>
+
+<!-- Resumen Ejecutivo -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-success h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Recaudación Neta</h6>
+        <div class="display-6">${{ pagos_mes_neto | round(2) }}</div>
+        <small class="text-muted">{{ pagos_detalle | length }} pagos</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-danger h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Gastos</h6>
+        <div class="display-6">${{ gastos_mes | round(2) }}</div>
+        <small class="text-muted">{{ gastos_detalle | length }} gastos</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-warning h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Comisiones Médicos</h6>
+        <div class="display-6">${{ total_comisiones | round(2) }}</div>
+        <small class="text-muted">{{ comisiones_detalle | length }} médicos</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-dark h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Saldo Final</h6>
+        <div class="display-6 {% if saldo_mes >= 0 %}text-success{% else %}text-danger{% endif %}">${{ saldo_mes | round(2) }}</div>
+        <small class="text-muted">Período: {{ first_of_month.strftime('%d/%m/%Y') }} - {{ (next_month - timedelta(days=1)).strftime('%d/%m/%Y') }}</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle de Pagos -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Detalle de Pagos ({{ pagos_detalle | length }} pagos)</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Paciente</th>
+            <th>Médico</th>
+            <th>Método</th>
+            <th>Monto Bruto</th>
+            <th>Descuento</th>
+            <th>Monto Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pagos_detalle %}
+          <tr>
+            <td>{{ p.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ p.paciente }}</td>
+            <td>{{ p.medico }}</td>
+            <td>{{ p.metodo }}</td>
+            <td>${{ p.monto_bruto | round(2) }}</td>
+            <td>{{ p.descuento | round(2) }}%</td>
+            <td class="fw-bold text-success">${{ p.monto_neto | round(2) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">Sin pagos en el período.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="6" class="text-end">Total Recaudado:</th>
+            <th class="text-success">${{ pagos_mes_neto | round(2) }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detalle de Gastos -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Detalle de Gastos ({{ gastos_detalle | length }} gastos)</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Categoría</th>
+            <th>Descripción</th>
+            <th>Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in gastos_detalle %}
+          <tr>
+            <td>{{ g.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ g.categoria or 'Sin categoría' }}</td>
+            <td>{{ g.descripcion or 'Sin descripción' }}</td>
+            <td class="fw-bold text-danger">${{ g.monto | round(2) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">Sin gastos en el período.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="3" class="text-end">Total Gastos:</th>
+            <th class="text-danger">${{ gastos_mes | round(2) }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Comisiones por Médico -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Comisiones por Médico ({{ comisiones_detalle | length }} médicos)</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Médico</th>
+            <th>% Comisión</th>
+            <th>Ventas Netas</th>
+            <th>Comisión</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in comisiones_detalle %}
+          <tr>
+            <td>{{ c.medico.apellido }}, {{ c.medico.nombre }}</td>
+            <td>{{ c.porcentaje | round(2) }}%</td>
+            <td>${{ c.pagos_netos | round(2) }}</td>
+            <td class="fw-bold text-warning">${{ c.comision | round(2) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center text-muted">Sin comisiones en el período.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="3" class="text-end">Total Comisiones:</th>
+            <th class="text-warning">${{ total_comisiones | round(2) }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen Final -->
+<div class="card">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0">Resumen Final del Mes</h5>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <h6>Ingresos:</h6>
+        <ul class="list-unstyled">
+          <li>Recaudación neta: <span class="fw-bold text-success">${{ pagos_mes_neto | round(2) }}</span></li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <h6>Egresos:</h6>
+        <ul class="list-unstyled">
+          <li>Gastos operativos: <span class="fw-bold text-danger">${{ gastos_mes | round(2) }}</span></li>
+          <li>Comisiones médicos: <span class="fw-bold text-warning">${{ total_comisiones | round(2) }}</span></li>
+        </ul>
+      </div>
+    </div>
+    <hr>
+    <div class="text-center">
+      <h4>Saldo Final: <span class="{% if saldo_mes >= 0 %}text-success{% else %}text-danger{% endif %}">${{ saldo_mes | round(2) }}</span></h4>
+      <small class="text-muted">Período: {{ first_of_month.strftime('%d/%m/%Y') }} - {{ (next_month - timedelta(days=1)).strftime('%d/%m/%Y') }}</small>
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .btn, .d-flex.gap-2 { display: none !important; }
+  .card { border: 1px solid #000 !important; }
+  .table { font-size: 12px; }
+}
+</style>
+{% endblock %}

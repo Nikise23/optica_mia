@@ -36,7 +36,7 @@
         <tr>
           <td>{{ r.fecha }}</td>
           <td>{{ r.paciente.apellido }}, {{ r.paciente.nombre }}</td>
-          <td>{{ r.medico.apellido }}, {{ r.medico.nombre }}</td>
+          <td>{% if r.medico %}{{ r.medico.apellido }}, {{ r.medico.nombre }}{% else %}Sin médico{% endif %}</td>
           <td>{{ r.tipo_lente or '' }}</td>
           <td>
             {% if r.medida_od or r.medida_os %}
