@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}Cerrar Caja · ÓpticaApp{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Cerrar Caja</h2>
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle"></i>
+  <strong>Atención:</strong> Esta acción calculará automáticamente los totales del día y cerrará la caja. No se podrá registrar más ventas hasta el próximo día.
+</div>
+
+<form method="post" class="row g-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Confirmar cierre de caja</h5>
+      </div>
+      <div class="card-body">
+        <p>Al confirmar, se calcularán automáticamente:</p>
+        <ul>
+          <li>Total en efectivo</li>
+          <li>Total en tarjeta</li>
+          <li>Total en transferencia</li>
+          <li>Total general del día</li>
+        </ul>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="confirmar" required>
+          <label class="form-check-label" for="confirmar">
+            Confirmo que deseo cerrar la caja para el día de hoy
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('caja_dashboard') }}">Cancelar</a>
+    <button class="btn btn-warning" type="submit">Cerrar Caja</button>
+  </div>
+</form>
+{% endblock %}
+

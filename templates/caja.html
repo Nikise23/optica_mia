@@ -1,19 +1,151 @@
 {% extends 'base.html' %}
+
+{% block title %}Caja · ÓpticaApp{% endblock %}
+
 {% block content %}
-<h2>Caja</h2>
-<table class="table table-bordered">
-    <thead>
-        <tr><th>Fecha</th><th>Monto</th><th>Método de Pago</th><th>Receta</th></tr>
-    </thead>
-    <tbody>
-        {% for v in ventas %}
-        <tr>
-            <td>{{ v.fecha }}</td>
-            <td>${{ v.monto }}</td>
-            <td>{{ v.metodo_pago }}</td>
-            <td>{{ v.receta_id }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Caja</h2>
+  <div class="d-flex gap-2">
+    <a class="btn btn-success" href="{{ url_for('caja_pago_create') }}"><i class="bi bi-plus-lg"></i> Nuevo Pago</a>
+    {% if not cierre_hoy %}
+    <a class="btn btn-warning" href="{{ url_for('caja_cierre_create') }}"><i class="bi bi-cash-coin"></i> Cerrar Caja</a>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ url_for('caja_cierre_csv') }}"><i class="bi bi-download"></i> Exportar CSV</a>
+    <a class="btn btn-outline-danger" href="{{ url_for('gastos_list') }}"><i class="bi bi-receipt"></i> Gastos</a>
+  </div>
+</div>
+
+<!-- Resumen del día -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-primary h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Pagos del día</h6>
+        <div class="display-6">{{ pagos_hoy | length }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-success h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Total cobrado</h6>
+        <div class="display-6">${{ (pagos_hoy | sum(attribute='monto') - (pagos_hoy | sum(attribute='descuento'))) | round(2) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-info h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Estado caja</h6>
+        <div class="display-6">{{ 'Cerrada' if cierre_hoy else 'Abierta' }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-warning h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Gastos del día</h6>
+        <div class="display-6">${{ total_gastos_hoy | round(2) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen por método de pago -->
+{% if resumen_metodos %}
+<div class="card mb-4">
+  <div class="card-header">Resumen por método de pago</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for metodo, total in resumen_metodos.items() %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="d-flex justify-content-between align-items-center p-2 border rounded">
+          <span class="fw-bold">{{ metodo }}</span>
+          <span class="text-success">${{ total | round(2) }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Pagos del día -->
+<div class="card mb-4">
+  <div class="card-header">Pagos del día</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Paciente</th>
+            <th>Método</th>
+            <th>Monto (neto)</th>
+            <th>Desc. (%)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pagos_hoy %}
+          <tr>
+            <td>{{ p.fecha }}</td>
+            <td>{{ p.receta.paciente.apellido }}, {{ p.receta.paciente.nombre }}</td>
+            <td>{{ p.metodo_pago or 'Sin especificar' }}</td>
+            <td>${{ (p.monto * (1 - ((p.descuento or 0)/100))) | round(2) }}</td>
+            <td>{{ p.descuento | round(2) }}%</td>
+            <td class="text-end">
+              <form method="post" action="{{ url_for('caja_pago_delete', pago_id=p.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar pago?');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">Sin pagos hoy.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagos recientes & Recaudación mensual -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Pagos recientes</span>
+    <span class="badge bg-success">Mes: Recaudado ${{ pagos_mes | round(2) }} · Gastos ${{ gastos_mes | round(2) }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Paciente</th>
+            <th>Médico</th>
+            <th>Método</th>
+            <th>Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pagos_recientes %}
+          <tr>
+            <td>{{ p.fecha }}</td>
+            <td>{{ p.receta.paciente.apellido }}, {{ p.receta.paciente.nombre }}</td>
+            <td>{{ p.receta.medico.apellido }}, {{ p.receta.medico.nombre }}</td>
+            <td>{{ p.metodo_pago or 'Sin especificar' }}</td>
+            <td>${{ (p.monto * (1 - ((p.descuento or 0)/100))) | round(2) }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">Sin ventas recientes.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

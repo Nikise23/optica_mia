@@ -1,24 +1,59 @@
 {% extends 'base.html' %}
+
+{% block title %}Médicos · ÓpticaApp{% endblock %}
+
 {% block content %}
-<h2>Médicos</h2>
-<a href="/medicos/nuevo" class="btn btn-primary mb-3">Agregar Médico</a>
-<table class="table table-bordered">
-    <thead>
-        <tr><th>Nombre</th><th>Matrícula</th><th>Especialidad</th><th>Comisión</th><th>Acciones</th></tr>
-    </thead>
-    <tbody>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Médicos</h2>
+  <a class="btn btn-primary" href="{{ url_for('medicos_create') }}"><i class="bi bi-plus-lg"></i> Nuevo</a>
+  </div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-sm-8 col-md-6">
+    <input type="text" name="q" value="{{ term or '' }}" class="form-control" placeholder="Buscar por nombre, apellido, matrícula o especialidad" />
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Apellido</th>
+          <th>Nombre</th>
+          <th>Matrícula</th>
+          <th>Especialidad</th>
+          <th>% Comisión</th>
+          <th>Contacto</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
         {% for m in medicos %}
         <tr>
-            <td>{{ m.nombre }} {{ m.apellido }}</td>
-            <td>{{ m.matricula }}</td>
-            <td>{{ m.especialidad }}</td>
-            <td>{{ m.porcentaje_comision }}%</td>
-            <td>
-                <a href="/medicos/editar/{{ m.id }}" class="btn btn-sm btn-warning">Editar</a>
-                <a href="/medicos/eliminar/{{ m.id }}" class="btn btn-sm btn-danger">Eliminar</a>
-            </td>
+          <td>{{ m.apellido }}</td>
+          <td>{{ m.nombre }}</td>
+          <td>{{ m.matricula }}</td>
+          <td>{{ m.especialidad or '' }}</td>
+          <td>{{ m.porcentaje_comision | round(2) }}%</td>
+          <td>{{ m.contacto or '' }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('medicos_edit', medico_id=m.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('medicos_delete', medico_id=m.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar médico?');">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">Sin médicos.</td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

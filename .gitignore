@@ -1,5 +1,9 @@
-# Entorno virtual
+# Entorno virtual (usás .venv en tu proyecto)
 venv/
+.venv/
+
+# Archivos de configuración sensibles
+.env
 
 # Archivos de base de datos
 *.db
@@ -16,3 +20,8 @@ __pycache__/
 # Archivos de sistema
 .DS_Store
 Thumbs.db
+
+# Archivos de compilación / distribución
+build/
+dist/
+*.egg-info/

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Nuevo Pago · ÓpticaApp{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Nuevo Pago</h2>
+<form method="post" class="row g-3" action="{{ url_for('caja_pago_create') }}">
+  <div class="col-12">
+    <label class="form-label">Receta</label>
+    <select name="receta_id" class="form-select" required>
+      <option value="">Seleccionar receta</option>
+      {% for r in recetas_sin_venta %}
+      <option value="{{ r.id }}">
+        {{ r.paciente.apellido }}, {{ r.paciente.nombre }} - {{ r.medico.apellido }}, {{ r.medico.nombre }} - ${{ r.total | round(2) }}
+      </option>
+      {% endfor %}
+    </select>
+    {% if not recetas_sin_venta %}
+    <div class="form-text text-warning">No hay recetas disponibles para vender.</div>
+    {% endif %}
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Método de pago</label>
+    <select name="metodo_pago" class="form-select" required>
+      <option value="">Seleccionar método</option>
+      <option value="Efectivo">Efectivo</option>
+      <option value="Tarjeta">Tarjeta</option>
+      <option value="Transferencia">Transferencia</option>
+    </select>
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Monto</label>
+    <input name="monto" type="number" step="0.01" min="0" class="form-control" required />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Descuento</label>
+    <input name="descuento" type="number" step="0.01" min="0" class="form-control" value="0" />
+  </div>
+  <div class="col-12 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('caja_dashboard') }}">Cancelar</a>
+    <button class="btn btn-primary" type="submit" {% if not recetas_sin_venta %}disabled{% endif %}>Registrar Pago</button>
+  </div>
+</form>
+{% endblock %}
+

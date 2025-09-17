@@ -1,23 +1,59 @@
 {% extends 'base.html' %}
+
+{% block title %}Pacientes · ÓpticaApp{% endblock %}
+
 {% block content %}
-<h2>Pacientes</h2>
-<a href="/pacientes/nuevo" class="btn btn-primary mb-3">Agregar Paciente</a>
-<table class="table table-bordered">
-    <thead>
-        <tr><th>Nombre</th><th>DNI</th><th>Contacto</th><th>Acciones</th></tr>
-    </thead>
-    <tbody>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Pacientes</h2>
+  <a class="btn btn-primary" href="{{ url_for('pacientes_create') }}"><i class="bi bi-plus-lg"></i> Nuevo</a>
+  </div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-sm-8 col-md-6">
+    <input type="text" name="q" value="{{ term or '' }}" class="form-control" placeholder="Buscar por nombre, apellido o DNI" />
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Apellido</th>
+          <th>Nombre</th>
+          <th>DNI</th>
+          <th>Fecha nacimiento</th>
+          <th>Obra social</th>
+          <th>Contacto</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
         {% for p in pacientes %}
         <tr>
-            <td>{{ p.nombre }} {{ p.apellido }}</td>
-            <td>{{ p.dni }}</td>
-            <td>{{ p.contacto }}</td>
-            <td>
-                <a href="/pacientes/editar/{{ p.id }}" class="btn btn-sm btn-warning">Editar</a>
-                <a href="/pacientes/eliminar/{{ p.id }}" class="btn btn-sm btn-danger">Eliminar</a>
-            </td>
+          <td>{{ p.apellido }}</td>
+          <td>{{ p.nombre }}</td>
+          <td>{{ p.dni }}</td>
+          <td>{{ p.fecha_nacimiento or '' }}</td>
+          <td>{{ p.obra_social or '' }}</td>
+          <td>{{ p.contacto or '' }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('pacientes_edit', paciente_id=p.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('pacientes_delete', paciente_id=p.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar paciente?');">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">Sin pacientes.</td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ 'Editar' if paciente else 'Nuevo' }} Paciente · ÓpticaApp{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">{{ 'Editar' if paciente else 'Nuevo' }} Paciente</h2>
+<form method="post" class="row g-3">
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Nombre</label>
+    <input name="nombre" class="form-control" value="{{ paciente.nombre if paciente else '' }}" required />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Apellido</label>
+    <input name="apellido" class="form-control" value="{{ paciente.apellido if paciente else '' }}" required />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">DNI</label>
+    <input name="dni" class="form-control" value="{{ paciente.dni if paciente else '' }}" />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Fecha de nacimiento</label>
+    <input name="fecha_nacimiento" type="date" class="form-control" value="{{ paciente.fecha_nacimiento if paciente and paciente.fecha_nacimiento else '' }}" />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Obra social</label>
+    <input name="obra_social" class="form-control" value="{{ paciente.obra_social if paciente else '' }}" />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Contacto</label>
+    <input name="contacto" class="form-control" value="{{ paciente.contacto if paciente else '' }}" />
+  </div>
+  <div class="col-12 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('pacientes_list') }}">Cancelar</a>
+    <button class="btn btn-primary" type="submit">Guardar</button>
+  </div>
+{% endblock %}
+
+
+

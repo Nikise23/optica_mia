@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ 'Editar' if producto else 'Nuevo' }} Producto · ÓpticaApp{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">{{ 'Editar' if producto else 'Nuevo' }} Producto</h2>
+<form method="post" class="row g-3">
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Código</label>
+    <input name="codigo" class="form-control" value="{{ producto.codigo if producto else '' }}" required />
+  </div>
+  <div class="col-sm-6 col-lg-8">
+    <label class="form-label">Nombre</label>
+    <input name="nombre" class="form-control" value="{{ producto.nombre if producto else '' }}" required />
+  </div>
+  <div class="col-12">
+    <label class="form-label">Descripción</label>
+    <textarea name="descripcion" class="form-control" rows="2">{{ producto.descripcion if producto else '' }}</textarea>
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Categoría</label>
+    <input name="categoria" class="form-control" value="{{ producto.categoria if producto else '' }}" />
+  </div>
+  <div class="col-sm-6 col-lg-4">
+    <label class="form-label">Precio unitario</label>
+    <input name="precio_unitario" type="number" step="0.01" min="0" class="form-control" value="{{ producto.precio_unitario if producto else '' }}" required />
+  </div>
+  <div class="col-sm-6 col-lg-2">
+    <label class="form-label">Cantidad</label>
+    <input name="cantidad" type="number" min="0" class="form-control" value="{{ producto.cantidad if producto else '' }}" required />
+  </div>
+  <div class="col-sm-6 col-lg-2">
+    <label class="form-label">Stock mínimo</label>
+    <input name="stock_minimo" type="number" min="0" class="form-control" value="{{ producto.stock_minimo if producto else '' }}" required />
+  </div>
+  <div class="col-12 d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('productos_list') }}">Cancelar</a>
+    <button class="btn btn-primary" type="submit">Guardar</button>
+  </div>
+{% endblock %}
+
+
+

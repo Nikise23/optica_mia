@@ -1,23 +1,65 @@
 {% extends 'base.html' %}
+
+{% block title %}Recetas · ÓpticaApp{% endblock %}
+
 {% block content %}
-<h2>Recetas</h2>
-<a href="/recetas/nueva" class="btn btn-primary mb-3">Cargar Receta</a>
-<table class="table table-bordered">
-    <thead>
-        <tr><th>Paciente</th><th>Médico</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr>
-    </thead>
-    <tbody>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Recetas</h2>
+  <a class="btn btn-primary" href="{{ url_for('recetas_create') }}"><i class="bi bi-plus-lg"></i> Nueva</a>
+  </div>
+
+<form class="row g-2 mb-3" method="get">
+  <div class="col-sm-8 col-md-6">
+    <input type="text" name="q" value="{{ term or '' }}" class="form-control" placeholder="Buscar por paciente, médico o tipo de lente" />
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Paciente</th>
+          <th>Médico</th>
+          <th>Tipo de lente</th>
+          <th>Medidas</th>
+          <th>Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
         {% for r in recetas %}
         <tr>
-            <td>{{ r.paciente_id }}</td>
-            <td>{{ r.medico_id }}</td>
-            <td>{{ r.fecha }}</td>
-            <td>${{ r.total }}</td>
-            <td>
-                <a href="/recetas/ver/{{ r.id }}" class="btn btn-sm btn-info">Ver</a>
-            </td>
+          <td>{{ r.fecha }}</td>
+          <td>{{ r.paciente.apellido }}, {{ r.paciente.nombre }}</td>
+          <td>{{ r.medico.apellido }}, {{ r.medico.nombre }}</td>
+          <td>{{ r.tipo_lente or '' }}</td>
+          <td>
+            {% if r.medida_od or r.medida_os %}
+              OD: {{ r.medida_od or '-' }} | OS: {{ r.medida_os or '-' }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>${{ r.total | round(2) }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('recetas_edit', receta_id=r.id) }}">Editar</a>
+            <form method="post" action="{{ url_for('recetas_delete', receta_id=r.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar receta?');">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">Sin recetas.</td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
+      </tbody>
+    </table>
+  </div>
+</div>
 {% endblock %}

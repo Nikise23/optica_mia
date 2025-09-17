@@ -20,6 +20,8 @@ class Paciente(db.Model):
     fecha_nacimiento = db.Column(db.Date)
     obra_social = db.Column(db.String(100))
     contacto = db.Column(db.String(100))
+    # Relación para acceder desde Receta como r.paciente
+    recetas = db.relationship('Receta', backref='paciente')
 
 class Medico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -41,6 +43,10 @@ class Receta(db.Model):
     medida_os = db.Column(db.String(50))
     observaciones = db.Column(db.String(200))
     total = db.Column(db.Float)
+    # Producto (armazón) asociado a la venta
+    armazon_id = db.Column(db.Integer, db.ForeignKey('producto.id'))
+    # Pagos relacionados
+    pagos = db.relationship('Pago', backref='receta')
     venta = db.relationship('Venta', backref='receta', uselist=False)
 
 class Venta(db.Model):
@@ -57,3 +63,19 @@ class CierreCaja(db.Model):
     total_tarjeta = db.Column(db.Float)
     total_transferencia = db.Column(db.Float)
     total_general = db.Column(db.Float)
+
+# Nuevos modelos para pagos parciales y gastos
+class Pago(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    receta_id = db.Column(db.Integer, db.ForeignKey('receta.id'), nullable=False)
+    metodo_pago = db.Column(db.String(50), nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    fecha = db.Column(db.Date, nullable=False)
+    descuento = db.Column(db.Float, default=0)
+
+class Gasto(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False)
+    categoria = db.Column(db.String(100))
+    descripcion = db.Column(db.String(200))
+    monto = db.Column(db.Float, nullable=False)
