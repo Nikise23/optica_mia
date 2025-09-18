@@ -11,7 +11,7 @@
       <option value="">Seleccionar receta</option>
       {% for item in recetas_con_saldo %}
       <option value="{{ item.receta.id }}">
-        {{ item.receta.paciente.apellido }}, {{ item.receta.paciente.nombre }} - {{ item.receta.medico.apellido }}, {{ item.receta.medico.nombre }} - Restante ${{ item.restante | round(2) }}
+        {{ item.receta.paciente.apellido }}, {{ item.receta.paciente.nombre }} - {% if item.receta.medico %}{{ item.receta.medico.apellido }}, {{ item.receta.medico.nombre }}{% else %}Sin médico{% endif %} - Restante ${{ item.restante | round(2) }}
       </option>
       {% endfor %}
     </select>

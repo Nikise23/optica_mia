@@ -91,7 +91,7 @@
             <th>Fecha</th>
             <th>Paciente</th>
             <th>Método</th>
-            <th>Monto (neto)</th>
+            <th>Monto</th>
             <th>Desc. (%)</th>
             <th></th>
           </tr>
@@ -102,7 +102,7 @@
             <td>{{ p.fecha }}</td>
             <td>{{ p.receta.paciente.apellido }}, {{ p.receta.paciente.nombre }}</td>
             <td>{{ p.metodo_pago or 'Sin especificar' }}</td>
-            <td>${{ (p.monto * (1 - ((p.descuento or 0)/100))) | round(2) }}</td>
+            <td>${{ p.monto | round(2) }}</td>
             <td>{{ p.descuento | round(2) }}%</td>
             <td class="text-end">
               <form method="post" action="{{ url_for('caja_pago_delete', pago_id=p.id) }}" style="display:inline" onsubmit="return confirm('¿Eliminar pago?');">
@@ -121,11 +121,11 @@
   </div>
 </div>
 
-<!-- Pagos recientes & Recaudación mensual -->
-<div class="card">
+<!-- Recetas Pendientes & Recaudación mensual -->
+<div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span>Pagos recientes</span>
-    <span class="badge bg-success">Mes: Recaudado ${{ pagos_mes | round(2) }} · Gastos ${{ gastos_mes | round(2) }}</span>
+    <span>Recetas Pendientes</span>
+    <span class="badge bg-warning">Mes: Recaudado ${{ pagos_mes | round(2) }} · Gastos ${{ gastos_mes | round(2) }}</span>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -135,26 +135,80 @@
             <th>Fecha</th>
             <th>Paciente</th>
             <th>Médico</th>
-            <th>Método</th>
-            <th>Monto</th>
+            <th>Total Original</th>
+            <th>Descuento</th>
+            <th>Total Final</th>
+            <th>Pagado</th>
+            <th>Saldo Pendiente</th>
           </tr>
         </thead>
         <tbody>
-          {% for p in pagos_recientes %}
+          {% for item in recetas_pendientes %}
           <tr>
-            <td>{{ p.fecha }}</td>
-            <td>{{ p.receta.paciente.apellido }}, {{ p.receta.paciente.nombre }}</td>
-            <td>{{ p.receta.medico.apellido }}, {{ p.receta.medico.nombre }}</td>
-            <td>{{ p.metodo_pago or 'Sin especificar' }}</td>
-            <td>${{ (p.monto * (1 - ((p.descuento or 0)/100))) | round(2) }}</td>
+            <td>{{ item.receta.fecha }}</td>
+            <td>{{ item.receta.paciente.apellido }}, {{ item.receta.paciente.nombre }}</td>
+            <td>{% if item.receta.medico %}{{ item.receta.medico.apellido }}, {{ item.receta.medico.nombre }}{% else %}Sin médico{% endif %}</td>
+            <td>${{ item.total_original | round(2) }}</td>
+            <td>{{ item.descuento_pct | round(2) }}%</td>
+            <td>${{ item.total_final | round(2) }}</td>
+            <td>${{ item.pagado | round(2) }}</td>
+            <td class="text-warning fw-bold">
+              ${{ item.saldo | round(2) }}
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="5" class="text-center text-muted">Sin ventas recientes.</td>
+            <td colspan="8" class="text-center text-muted">No hay recetas pendientes.</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Recetas finalizadas -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Recetas finalizadas</span>
+    <span class="badge bg-success">Mes: Recaudado ${{ pagos_mes | round(2) }} · Gastos ${{ gastos_mes | round(2) }}</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+    <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Paciente</th>
+            <th>Médico</th>
+            <th>Total Original</th>
+            <th>Descuento</th>
+            <th>Total Final</th>
+            <th>Pagado</th>
+            <th>Saldo</th>
+          </tr>
+    </thead>
+    <tbody>
+          {% for item in recetas_finalizadas %}
+          <tr>
+            <td>{{ item.receta.fecha }}</td>
+            <td>{{ item.receta.paciente.apellido }}, {{ item.receta.paciente.nombre }}</td>
+            <td>{% if item.receta.medico %}{{ item.receta.medico.apellido }}, {{ item.receta.medico.nombre }}{% else %}Sin médico{% endif %}</td>
+            <td>${{ item.total_original | round(2) }}</td>
+            <td>{{ item.descuento_pct | round(2) }}%</td>
+            <td>${{ item.total_final | round(2) }}</td>
+            <td>${{ item.pagado | round(2) }}</td>
+            <td class="{% if item.saldo <= 1e-6 %}text-success{% else %}text-warning{% endif %}">
+              ${{ item.saldo | round(2) }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted">Sin recetas finalizadas.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
     </div>
   </div>
 </div>

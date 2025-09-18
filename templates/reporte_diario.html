@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block title %}Reporte Diario · ÓpticaApp{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="mb-0">Reporte Diario</h2>
+  <div class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2">
+      <input type="date" name="fecha" value="{{ fecha_consulta }}" class="form-control" style="width: auto;">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button>
+    </form>
+    <a class="btn btn-outline-secondary" href="{{ url_for('reporte_mensual') }}"><i class="bi bi-calendar-month"></i> Reporte Mensual</a>
+  </div>
+</div>
+
+<!-- Resumen del día -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-primary h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Pagos del día</h6>
+        <div class="display-6">{{ pagos_dia | length }}</div>
+        <small class="text-muted">{{ fecha_consulta.strftime('%d/%m/%Y') }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-success h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Total cobrado</h6>
+        <div class="display-6">${{ total_pagos_dia | round(2) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-danger h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Gastos del día</h6>
+        <div class="display-6">${{ total_gastos_dia | round(2) }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-bg-info h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-1">Saldo del día</h6>
+        <div class="display-6 {% if (total_pagos_dia - total_gastos_dia) >= 0 %}text-success{% else %}text-danger{% endif %}">
+          ${{ (total_pagos_dia - total_gastos_dia) | round(2) }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resumen por método de pago -->
+{% if resumen_metodos %}
+<div class="card mb-4">
+  <div class="card-header">Resumen por método de pago</div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for metodo, monto in resumen_metodos.items() %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="card border-primary">
+          <div class="card-body text-center">
+            <h6 class="card-title">{{ metodo }}</h6>
+            <div class="h4 text-primary">${{ monto | round(2) }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Cierre de caja del día -->
+{% if cierre_dia %}
+<div class="card mb-4">
+  <div class="card-header">Cierre de caja del día</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card border-success">
+          <div class="card-body text-center">
+            <h6 class="card-title">Efectivo</h6>
+            <div class="h4 text-success">${{ cierre_dia.total_efectivo | round(2) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card border-info">
+          <div class="card-body text-center">
+            <h6 class="card-title">Tarjeta</h6>
+            <div class="h4 text-info">${{ cierre_dia.total_tarjeta | round(2) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card border-warning">
+          <div class="card-body text-center">
+            <h6 class="card-title">Transferencia</h6>
+            <div class="h4 text-warning">${{ cierre_dia.total_transferencia | round(2) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card border-dark">
+          <div class="card-body text-center">
+            <h6 class="card-title">Total General</h6>
+            <div class="h4 text-dark">${{ cierre_dia.total_general | round(2) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Detalle de Recetas del día -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Detalle de Recetas ({{ recetas_dia | length }} recetas)</h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Paciente</th>
+            <th>Médico</th>
+            <th>Método</th>
+            <th>Total Original</th>
+            <th>Descuento</th>
+            <th>Total Final</th>
+            <th>Pagado (Día)</th>
+            <th>Pagado (Total)</th>
+            <th>Saldo Pendiente</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recetas_dia %}
+          <tr>
+            <td>{{ r.receta.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ r.receta.paciente.apellido }}, {{ r.receta.paciente.nombre }}</td>
+            <td>{% if r.receta.medico %}{{ r.receta.medico.apellido }}, {{ r.receta.medico.nombre }}{% else %}Sin médico{% endif %}</td>
+            <td>{{ r.metodo }}</td>
+            <td>${{ r.total_original | round(2) }}</td>
+            <td>{{ r.descuento_pct | round(2) }}%</td>
+            <td>${{ r.total_final | round(2) }}</td>
+            <td class="fw-bold text-primary">${{ r.pagado_dia | round(2) }}</td>
+            <td class="fw-bold text-info">${{ r.pagado_total | round(2) }}</td>
+            <td class="{% if r.saldo_pendiente <= 1e-6 %}text-success{% else %}text-warning{% endif %}">
+              ${{ r.saldo_pendiente | round(2) }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="10" class="text-center text-muted">Sin recetas en este día.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="7" class="text-end">Total Recaudado (Día):</th>
+            <th class="text-primary">${{ total_pagos_dia | round(2) }}</th>
+            <th colspan="2"></th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Gastos del día -->
+{% if gastos_dia %}
+<div class="card mb-4">
+  <div class="card-header">Gastos del día</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Categoría</th>
+            <th>Descripción</th>
+            <th>Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in gastos_dia %}
+          <tr>
+            <td>{{ g.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ g.categoria or '' }}</td>
+            <td>{{ g.descripcion or '' }}</td>
+            <td>${{ g.monto | round(2) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="3" class="text-end">Total Gastos:</th>
+            <th class="text-danger">${{ total_gastos_dia | round(2) }}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="text-center mt-4">
+  <button class="btn btn-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir Reporte</button>
+</div>
+{% endblock %}
+

@@ -6,10 +6,34 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="mb-0">Reporte Mensual</h2>
   <div class="d-flex gap-2">
+    <form method="get" class="d-flex gap-2">
+      <select name="año" class="form-select" style="width: auto;">
+        {% for año in range(2024, 2027) %}
+        <option value="{{ año }}" {% if año == first_of_month.year %}selected{% endif %}>{{ año }}</option>
+        {% endfor %}
+      </select>
+      <select name="mes" class="form-select" style="width: auto;">
+        <option value="1" {% if first_of_month.month == 1 %}selected{% endif %}>Enero</option>
+        <option value="2" {% if first_of_month.month == 2 %}selected{% endif %}>Febrero</option>
+        <option value="3" {% if first_of_month.month == 3 %}selected{% endif %}>Marzo</option>
+        <option value="4" {% if first_of_month.month == 4 %}selected{% endif %}>Abril</option>
+        <option value="5" {% if first_of_month.month == 5 %}selected{% endif %}>Mayo</option>
+        <option value="6" {% if first_of_month.month == 6 %}selected{% endif %}>Junio</option>
+        <option value="7" {% if first_of_month.month == 7 %}selected{% endif %}>Julio</option>
+        <option value="8" {% if first_of_month.month == 8 %}selected{% endif %}>Agosto</option>
+        <option value="9" {% if first_of_month.month == 9 %}selected{% endif %}>Septiembre</option>
+        <option value="10" {% if first_of_month.month == 10 %}selected{% endif %}>Octubre</option>
+        <option value="11" {% if first_of_month.month == 11 %}selected{% endif %}>Noviembre</option>
+        <option value="12" {% if first_of_month.month == 12 %}selected{% endif %}>Diciembre</option>
+      </select>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Buscar</button>
+    </form>
     <button class="btn btn-outline-primary" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
-    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}"><i class="bi bi-arrow-left"></i> Volver</a>
+    <a class="btn btn-outline-secondary" href="{{ url_for('reporte_diario') }}"><i class="bi bi-calendar-day"></i> Reporte Diario</a>
   </div>
 </div>
+
+<h3 class="mb-3">{{ first_of_month.strftime('%B %Y') }}</h3>
 
 <!-- Resumen Ejecutivo -->
 <div class="row g-3 mb-4">
@@ -51,10 +75,10 @@
   </div>
 </div>
 
-<!-- Detalle de Pagos -->
+<!-- Detalle de Recetas -->
 <div class="card mb-4">
   <div class="card-header">
-    <h5 class="mb-0">Detalle de Pagos ({{ pagos_detalle | length }} pagos)</h5>
+    <h5 class="mb-0">Detalle de Recetas ({{ recetas_detalle | length }} recetas)</h5>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -65,32 +89,41 @@
             <th>Paciente</th>
             <th>Médico</th>
             <th>Método</th>
-            <th>Monto Bruto</th>
+            <th>Total Original</th>
             <th>Descuento</th>
-            <th>Monto Neto</th>
+            <th>Total Final</th>
+            <th>Pagado (Mes)</th>
+            <th>Pagado (Total)</th>
+            <th>Saldo Pendiente</th>
           </tr>
         </thead>
         <tbody>
-          {% for p in pagos_detalle %}
+          {% for r in recetas_detalle %}
           <tr>
-            <td>{{ p.fecha.strftime('%d/%m/%Y') }}</td>
-            <td>{{ p.paciente }}</td>
-            <td>{{ p.medico }}</td>
-            <td>{{ p.metodo }}</td>
-            <td>${{ p.monto_bruto | round(2) }}</td>
-            <td>{{ p.descuento | round(2) }}%</td>
-            <td class="fw-bold text-success">${{ p.monto_neto | round(2) }}</td>
+            <td>{{ r.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ r.paciente }}</td>
+            <td>{{ r.medico }}</td>
+            <td>{{ r.metodo }}</td>
+            <td>${{ r.total_original | round(2) }}</td>
+            <td>{{ r.descuento | round(2) }}%</td>
+            <td>${{ r.total_final | round(2) }}</td>
+            <td class="fw-bold text-primary">${{ r.pagado_mes | round(2) }}</td>
+            <td class="fw-bold text-info">${{ r.pagado_total | round(2) }}</td>
+            <td class="{% if r.saldo_pendiente <= 1e-6 %}text-success{% else %}text-warning{% endif %}">
+              ${{ r.saldo_pendiente | round(2) }}
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted">Sin pagos en el período.</td>
+            <td colspan="10" class="text-center text-muted">Sin recetas en el período.</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot class="table-light">
           <tr>
-            <th colspan="6" class="text-end">Total Recaudado:</th>
-            <th class="text-success">${{ pagos_mes_neto | round(2) }}</th>
+            <th colspan="7" class="text-end">Total Recaudado (Mes):</th>
+            <th class="text-primary">${{ pagos_mes_neto | round(2) }}</th>
+            <th colspan="2"></th>
           </tr>
         </tfoot>
       </table>
@@ -217,3 +250,4 @@
 }
 </style>
 {% endblock %}
+

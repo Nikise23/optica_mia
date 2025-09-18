@@ -21,7 +21,7 @@ class Paciente(db.Model):
     obra_social = db.Column(db.String(100))
     contacto = db.Column(db.String(100))
     # Relación para acceder desde Receta como r.paciente
-    recetas = db.relationship('Receta', backref='paciente')
+    recetas = db.relationship('Receta', backref='paciente', cascade='all, delete-orphan')
 
 class Medico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -31,7 +31,7 @@ class Medico(db.Model):
     especialidad = db.Column(db.String(100))
     contacto = db.Column(db.String(100))
     porcentaje_comision = db.Column(db.Float)
-    recetas = db.relationship('Receta', backref='medico')
+    recetas = db.relationship('Receta', backref='medico', cascade='all, delete-orphan')
 
 class Receta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -46,8 +46,8 @@ class Receta(db.Model):
     # Producto (armazón) asociado a la venta
     armazon_id = db.Column(db.Integer, db.ForeignKey('producto.id'))
     # Pagos relacionados
-    pagos = db.relationship('Pago', backref='receta')
-    venta = db.relationship('Venta', backref='receta', uselist=False)
+    pagos = db.relationship('Pago', backref='receta', cascade='all, delete-orphan')
+    venta = db.relationship('Venta', backref='receta', uselist=False, cascade='all, delete-orphan')
 
 class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)

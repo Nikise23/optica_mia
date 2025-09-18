@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from models.models import db, Producto, Paciente, Medico, Receta, Venta, CierreCaja, Pago, Gasto
-from datetime import datetime, date
+from datetime import date, datetime
 from sqlalchemy import func
 
 app = Flask(__name__)
@@ -359,11 +359,12 @@ def medicos_delete(medico_id: int):
 # ---------- CRUD Recetas ----------
 @app.route('/recetas')
 def recetas_list():
-    query = Receta.query.join(Paciente).join(Medico).order_by(Receta.fecha.desc())
+    from sqlalchemy.orm import joinedload
+    query = Receta.query.options(joinedload(Receta.paciente), joinedload(Receta.medico)).order_by(Receta.fecha.desc())
     term = request.args.get('q')
     if term:
         like = f"%{term}%"
-        query = query.filter(
+        query = query.join(Paciente).outerjoin(Medico).filter(
             (Paciente.nombre.ilike(like)) |
             (Paciente.apellido.ilike(like)) |
             (Medico.nombre.ilike(like)) |
@@ -389,9 +390,13 @@ def recetas_create():
             else:
                 fecha_val = date.today()
             
+            # Manejar médico opcional
+            medico_id_val = request.form.get('medico_id', '').strip()
+            medico_id = int(medico_id_val) if medico_id_val else None
+            
             receta = Receta(
                 paciente_id=int(request.form.get('paciente_id') or 0),
-                medico_id=int(request.form.get('medico_id') or 0),
+                medico_id=medico_id,
                 fecha=fecha_val,
                 tipo_lente=(request.form.get('tipo_lente') or '').strip() or None,
                 medida_od=(request.form.get('medida_od') or '').strip() or None,
@@ -424,7 +429,9 @@ def recetas_edit(receta_id: int):
     if request.method == 'POST':
         try:
             receta.paciente_id = int(request.form.get('paciente_id') or 0)
-            receta.medico_id = int(request.form.get('medico_id') or 0)
+            # Manejar médico opcional
+            medico_id_val = request.form.get('medico_id', '').strip()
+            receta.medico_id = int(medico_id_val) if medico_id_val else None
             fecha_str = (request.form.get('fecha') or '').strip()
             if fecha_str:
                 try:
@@ -494,16 +501,58 @@ def caja_dashboard():
     gastos_hoy = Gasto.query.filter_by(fecha=hoy).all()
     total_gastos_hoy = sum(g.monto or 0 for g in gastos_hoy)
 
-    # Cierre de caja de hoy
+    # Cierre de caja de hoy - apertura automática si no existe
     cierre_hoy = CierreCaja.query.filter_by(fecha=hoy).first()
+    if not cierre_hoy:
+        # Crear cierre automático para hoy (abierto)
+        cierre_hoy = CierreCaja(
+            fecha=hoy,
+            total_efectivo=0,
+            total_tarjeta=0,
+            total_transferencia=0,
+            total_general=0,
+            estado_abierta=True
+        )
+        db.session.add(cierre_hoy)
+        db.session.commit()
+        flash('Caja abierta automáticamente para hoy', 'info')
 
-    # Pagos recientes (últimos 10)
-    pagos_recientes = (
-        Pago.query.join(Receta).join(Paciente)
-        .order_by(Pago.fecha.desc())
-        .limit(10)
-        .all()
-    )
+    # Recetas finalizadas (completamente pagadas)
+    from sqlalchemy.orm import joinedload
+    recetas_finalizadas = []
+    recetas_pendientes = []
+    
+    for r in Receta.query.options(joinedload(Receta.paciente), joinedload(Receta.medico)).all():
+        pagos_brutos = sum((p.monto or 0) for p in getattr(r, 'pagos', []) or [])
+        saldo_restante = max(0.0, (r.total or 0) - pagos_brutos)
+        
+        # Calcular descuento aplicado comparando con el total original
+        descuento_pct = r.pagos[0].descuento if r.pagos and r.pagos[0].descuento > 0 else 0
+        if descuento_pct > 0:
+            total_original = r.total / (1 - (descuento_pct / 100.0))
+        else:
+            total_original = r.total
+            
+        receta_data = {
+            'receta': r,
+            'total_original': total_original,
+            'descuento_pct': descuento_pct,
+            'total_final': r.total,
+            'pagado': pagos_brutos,
+            'saldo': saldo_restante
+        }
+        
+        if saldo_restante <= 1e-6:  # Receta completamente pagada
+            recetas_finalizadas.append(receta_data)
+        else:  # Receta con saldo pendiente
+            recetas_pendientes.append(receta_data)
+    
+    # Ordenar por fecha de último pago
+    recetas_finalizadas.sort(key=lambda x: max(p.fecha for p in x['receta'].pagos) if x['receta'].pagos else x['receta'].fecha, reverse=True)
+    recetas_finalizadas = recetas_finalizadas[:10]  # Últimas 10
+    
+    recetas_pendientes.sort(key=lambda x: max(p.fecha for p in x['receta'].pagos) if x['receta'].pagos else x['receta'].fecha, reverse=True)
+    recetas_pendientes = recetas_pendientes[:10]  # Últimas 10
 
     # Recaudación mensual (pagos) y gastos mensuales
     first_of_month = date(hoy.year, hoy.month, 1)
@@ -525,7 +574,8 @@ def caja_dashboard():
         gastos_hoy=gastos_hoy,
         total_gastos_hoy=total_gastos_hoy,
         cierre_hoy=cierre_hoy,
-        pagos_recientes=pagos_recientes,
+        recetas_finalizadas=recetas_finalizadas,
+        recetas_pendientes=recetas_pendientes,
         pagos_mes=pagos_mes,
         gastos_mes=gastos_mes,
     )
@@ -554,14 +604,15 @@ def caja_pago_create():
             # Si es el primer pago con descuento, aplicar el descuento al total de la receta
             if len(pagos_existentes) == 0 and descuento_pct > 0:
                 receta.total = (receta.total or 0) * (1 - (descuento_pct / 100.0))
-                # Para evitar doble descuento sobre este pago, se registra con 0% de descuento
-                descuento_pct = 0.0
+                # Mantener el descuento original en el pago para registro histórico
 
-            total_pagado_neto = sum((px.monto or 0) * (1 - ((px.descuento or 0) / 100.0)) for px in pagos_existentes)
-            saldo_restante = (receta.total or 0) - total_pagado_neto
-            monto_neto = monto_val * (1 - (descuento_pct / 100.0))
-            if monto_neto > saldo_restante + 1e-6:
-                raise Exception('El pago neto supera el saldo restante de la receta')
+            # Calcular saldo restante considerando que el total ya puede tener descuento aplicado
+            total_pagado_bruto = sum((px.monto or 0) for px in pagos_existentes)
+            saldo_restante = (receta.total or 0) - total_pagado_bruto
+            
+            # Validar que el monto no supere el saldo restante
+            if monto_val > saldo_restante + 1e-6:
+                raise Exception('El monto supera el saldo restante de la receta')
 
             pago = Pago(
                 receta_id=receta.id,
@@ -579,12 +630,13 @@ def caja_pago_create():
             flash(f'Error al registrar pago: {exc}')
     
     # Obtener recetas con saldo pendiente (no completamente pagadas)
+    from sqlalchemy.orm import joinedload
     recetas_con_saldo = []
-    for r in Receta.query.join(Paciente).join(Medico).all():
-        pagos_netos = sum((p.monto or 0) * (1 - ((p.descuento or 0) / 100.0)) for p in getattr(r, 'pagos', []) or [])
-        saldo_restante = max(0.0, (r.total or 0) - pagos_netos)
+    for r in Receta.query.options(joinedload(Receta.paciente), joinedload(Receta.medico)).all():
+        pagos_brutos = sum((p.monto or 0) for p in getattr(r, 'pagos', []) or [])
+        saldo_restante = max(0.0, (r.total or 0) - pagos_brutos)
         if saldo_restante > 1e-6:  # Tolerancia para redondeos
-            recetas_con_saldo.append({'receta': r, 'restante': saldo_restante, 'pagado_neto': pagos_netos})
+            recetas_con_saldo.append({'receta': r, 'restante': saldo_restante, 'pagado_neto': pagos_brutos})
     
     return render_template('pago_form.html', recetas_con_saldo=recetas_con_saldo)
 
@@ -717,31 +769,150 @@ def gastos_delete(gasto_id: int):
     return redirect(url_for('gastos_list'))
 
 
+@app.route('/reporte-diario')
+def reporte_diario():
+    # Obtener fecha del parámetro o usar hoy
+    fecha_str = request.args.get('fecha')
+    if fecha_str:
+        try:
+            fecha_consulta = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_consulta = date.today()
+    else:
+        fecha_consulta = date.today()
+    
+    # Pagos del día
+    pagos_dia = Pago.query.filter_by(fecha=fecha_consulta).all()
+    total_pagos_dia = sum((p.monto or 0) for p in pagos_dia)
+    
+    # Gastos del día
+    gastos_dia = Gasto.query.filter_by(fecha=fecha_consulta).all()
+    total_gastos_dia = sum((g.monto or 0) for g in gastos_dia)
+    
+    # Cierre de caja del día
+    cierre_dia = CierreCaja.query.filter_by(fecha=fecha_consulta).first()
+    
+    # Resumen por método de pago
+    resumen_metodos = {}
+    for pago in pagos_dia:
+        metodo = pago.metodo_pago or 'Sin especificar'
+        if metodo not in resumen_metodos:
+            resumen_metodos[metodo] = 0
+        resumen_metodos[metodo] += pago.monto or 0
+    
+    # Recetas del día (agrupadas)
+    recetas_dia = []
+    recetas_con_pagos = db.session.query(Receta).join(Pago).filter(Pago.fecha == fecha_consulta).distinct().all()
+    
+    for r in recetas_con_pagos:
+        pagos_receta = Pago.query.filter(Pago.receta_id == r.id, Pago.fecha == fecha_consulta).all()
+        total_pagado_dia = sum((p.monto or 0) for p in pagos_receta)
+        
+        # Calcular descuento aplicado
+        descuento_pct = r.pagos[0].descuento if r.pagos and r.pagos[0].descuento > 0 else 0
+        if descuento_pct > 0:
+            total_original = r.total / (1 - (descuento_pct / 100.0))
+        else:
+            total_original = r.total
+        
+        # Calcular saldos
+        total_pagado_total = sum((p.monto or 0) for p in r.pagos)
+        saldo_pendiente = max(0.0, (r.total or 0) - total_pagado_total)
+        
+        # Métodos de pago del día
+        metodos_dia = list(set(p.metodo_pago or 'Sin especificar' for p in pagos_receta))
+        
+        recetas_dia.append({
+            'receta': r,
+            'total_original': total_original,
+            'descuento_pct': descuento_pct,
+            'total_final': r.total,
+            'pagado_dia': total_pagado_dia,
+            'pagado_total': total_pagado_total,
+            'saldo_pendiente': saldo_pendiente,
+            'metodo': ', '.join(metodos_dia)
+        })
+    
+    # Ordenar por fecha
+    recetas_dia.sort(key=lambda x: x['receta'].fecha, reverse=True)
+    
+    return render_template(
+        'reporte_diario.html',
+        fecha_consulta=fecha_consulta,
+        pagos_dia=pagos_dia,
+        total_pagos_dia=total_pagos_dia,
+        gastos_dia=gastos_dia,
+        total_gastos_dia=total_gastos_dia,
+        cierre_dia=cierre_dia,
+        resumen_metodos=resumen_metodos,
+        recetas_dia=recetas_dia
+    )
+
+
 @app.route('/reporte-mensual')
 def reporte_mensual():
-    # Fechas del mes actual
-    hoy = date.today()
+    # Obtener mes y año del parámetro o usar actual
+    mes = request.args.get('mes', date.today().month, type=int)
+    año = request.args.get('año', date.today().year, type=int)
+    
+    hoy = date(año, mes, 1)
     first_of_month = date(hoy.year, hoy.month, 1)
     if hoy.month == 12:
         next_month = date(hoy.year + 1, 1, 1)
     else:
         next_month = date(hoy.year, hoy.month + 1, 1)
     
-    # Recaudación neta del mes
+    # Recaudación neta del mes - agrupado por receta
     pagos_mes_neto = 0.0
-    pagos_detalle = []
-    for p in Pago.query.filter(Pago.fecha >= first_of_month, Pago.fecha < next_month).all():
-        monto_neto = (p.monto or 0) * (1 - ((p.descuento or 0) / 100.0))
-        pagos_mes_neto += monto_neto
-        pagos_detalle.append({
-            'fecha': p.fecha,
-            'paciente': f"{p.receta.paciente.apellido}, {p.receta.paciente.nombre}",
-            'medico': f"{p.receta.medico.apellido}, {p.receta.medico.nombre}" if p.receta.medico else "Sin médico",
-            'metodo': p.metodo_pago or 'Sin especificar',
-            'monto_bruto': p.monto or 0,
-            'descuento': p.descuento or 0,
-            'monto_neto': monto_neto
+    recetas_detalle = []
+    
+    # Obtener recetas que tuvieron pagos en el mes
+    recetas_con_pagos = db.session.query(Receta).join(Pago).filter(
+        Pago.fecha >= first_of_month, 
+        Pago.fecha < next_month
+    ).distinct().all()
+    
+    for r in recetas_con_pagos:
+        # Pagos de esta receta en el mes
+        pagos_receta = Pago.query.filter(
+            Pago.receta_id == r.id,
+            Pago.fecha >= first_of_month, 
+            Pago.fecha < next_month
+        ).all()
+        
+        # Calcular totales
+        total_pagado_mes = sum((p.monto or 0) for p in pagos_receta)
+        pagos_mes_neto += total_pagado_mes
+        
+        # Calcular descuento aplicado
+        descuento_pct = r.pagos[0].descuento if r.pagos and r.pagos[0].descuento > 0 else 0
+        if descuento_pct > 0:
+            total_original = r.total / (1 - (descuento_pct / 100.0))
+        else:
+            total_original = r.total
+        
+        # Calcular saldos
+        total_pagado_total = sum((p.monto or 0) for p in r.pagos)
+        saldo_pendiente = max(0.0, (r.total or 0) - total_pagado_total)
+        
+        # Métodos de pago del mes (únicos)
+        metodos_mes = list(set(p.metodo_pago or 'Sin especificar' for p in pagos_receta))
+        
+        recetas_detalle.append({
+            'fecha': r.fecha,
+            'paciente': f"{r.paciente.apellido}, {r.paciente.nombre}",
+            'medico': f"{r.medico.apellido}, {r.medico.nombre}" if r.medico else "Sin médico",
+            'metodo': ', '.join(metodos_mes),
+            'total_original': total_original,
+            'descuento': descuento_pct,
+            'total_final': r.total,
+            'pagado_mes': total_pagado_mes,
+            'pagado_total': total_pagado_total,
+            'saldo_pendiente': saldo_pendiente
         })
+    
+    # Ordenar por fecha
+    recetas_detalle.sort(key=lambda x: x['fecha'], reverse=True)
     
     # Gastos del mes
     gastos_mes = (
@@ -782,7 +953,7 @@ def reporte_mensual():
         first_of_month=first_of_month,
         next_month=next_month,
         pagos_mes_neto=pagos_mes_neto,
-        pagos_detalle=pagos_detalle,
+        recetas_detalle=recetas_detalle,
         gastos_mes=gastos_mes,
         gastos_detalle=gastos_detalle,
         comisiones_detalle=comisiones_detalle,
